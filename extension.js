@@ -101,7 +101,7 @@ const BasicPanelMenu = GObject.registerClass(
                 this._fileMonitor.connect('changed', (monitor, file, otherFile, eventType) => {
                     if (eventType === Gio.FileMonitorEvent.CHANGED || eventType === Gio.FileMonitorEvent.CREATED) {
                         try {
-                            const maxLength = 50; // Default max label length
+                            const maxLength = this._settings.get_int('max-length') || 50;
                             let [success, contents] = GLib.file_get_contents(logFile);
                             if (success && contents.length > 0) {
                                 let lines = new TextDecoder().decode(contents).trim().split('\n');
@@ -123,15 +123,15 @@ const BasicPanelMenu = GObject.registerClass(
                                         let potential = line + ' | ' + combinedText;
                                         // Also strip codes from potential before checking length
                                         let potentialClean = potential.replace(/\x1b\[[^m]*m/g, '').replace(/\x1b\[?[0-9;]*[a-zA-Z]/g, '').replace(/\x1b[^\[]/g, '').replace(/[\x00-\x1f\x7f]/g, '');
-                                        if (potentialClean.length > maxLength) break;
+                                        if (maxLength > 0 && potentialClean.length > maxLength) break;
                                         combinedText = potentialClean;
                                     }
                                     
-                                    if (combinedText.length >= maxLength) break;
+                                    if (maxLength > 0 && combinedText.length >= maxLength) break;
                                 }
                                 
                                 if (combinedText.length > 0) {
-                                    if (combinedText.length > maxLength)
+                                    if (maxLength > 0 && combinedText.length > maxLength)
                                         combinedText = combinedText.substring(0, maxLength) + "…";
                                     this._label.set_text(`[${session}] ${combinedText}`);
                                 }

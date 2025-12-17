@@ -11,5 +11,10 @@
       <summary>Panel index</summary>
       <description>Index position within the panel (0 = first position)</description>
     </key>
+    <key type="i" name="max-length">
+      <default>50</default>
+      <summary>Maximum label length</summary>
+      <description>Maximum number of characters to display in the panel (0 = unlimited)</description>
+    </key>
   </schema>
 </schemalist>

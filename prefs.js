@@ -74,6 +74,29 @@ function buildPreferencesUI(window) {
         settings.set_int('panel-index', Math.floor(indexRow.get_value()));
     });
     positionGroup.add(indexRow);
+
+    // Max length group
+    const maxLengthGroup = new Adw.PreferencesGroup({
+        title: 'Display Settings',
+        description: 'Configure how the tmux output is displayed',
+    });
+    page.add(maxLengthGroup);
+
+    // Max length spinner
+    const maxLengthRow = new Adw.SpinRow({
+        title: 'Maximum Label Length',
+        subtitle: 'Characters to display (0 = unlimited)',
+        adjustment: new Gtk.Adjustment({
+            lower: 0,
+            upper: 500,
+            step_increment: 5,
+        }),
+    });
+    maxLengthRow.set_value(settings.get_int('max-length'));
+    maxLengthRow.connect('notify::value', () => {
+        settings.set_int('max-length', Math.floor(maxLengthRow.get_value()));
+    });
+    maxLengthGroup.add(maxLengthRow);
 }
 
 // GNOME 42+ API
