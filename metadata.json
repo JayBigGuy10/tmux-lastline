@@ -1,7 +1,7 @@
 {
   "uuid": "tmux-lastline@local",
   "name": "Tmux Last Line",
-  "description": "Show the last line of tmux session 'server' in the top bar",
+  "description": "Show the last line of tmux session in the top bar",
   "version": 1,
   "shell-version": ["46"],
   "url": ""
