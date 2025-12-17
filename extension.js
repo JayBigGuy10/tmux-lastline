@@ -17,6 +17,7 @@ export default class TmuxLastLineExtension extends Extension {
         this._tmuxProcess = null;
         this._sessionWatcherId = null;
         this._currentSession = null;
+        this._userSelectedSession = null;
         this._settings = null;
         this._settingsHandlers = [];
     }
@@ -131,13 +132,38 @@ export default class TmuxLastLineExtension extends Extension {
     }
 
     _checkSessionChange() {
-        let newSession = this._getMostRecentSession();
-        if (newSession !== this._currentSession) {
-            this._stopTmuxPipe();
-            this._currentSession = newSession;
-            if (this._currentSession) {
-                this._startTmuxPipe(this._currentSession);
+        let sessions = this._getAllSessions();
+        
+        // If user selected a session, stick with it unless it no longer exists
+        if (this._userSelectedSession) {
+            if (sessions.includes(this._userSelectedSession)) {
+                // User's selected session still exists, keep it
+                if (this._currentSession !== this._userSelectedSession) {
+                    this._stopTmuxPipe();
+                    this._currentSession = this._userSelectedSession;
+                    this._startTmuxPipe(this._currentSession);
+                }
+                return true;
             } else {
+                // User's selected session no longer exists
+                this._userSelectedSession = null;
+                this._stopTmuxPipe();
+                this._currentSession = null;
+            }
+        }
+        
+        // Auto-select the first available session
+        if (sessions.length > 0) {
+            let newSession = sessions[0];
+            if (newSession !== this._currentSession) {
+                this._stopTmuxPipe();
+                this._currentSession = newSession;
+                this._startTmuxPipe(this._currentSession);
+            }
+        } else {
+            if (this._currentSession !== null) {
+                this._stopTmuxPipe();
+                this._currentSession = null;
                 this._tmuxLabel.set_text("[tmux n/a]");
             }
         }
@@ -182,8 +208,15 @@ export default class TmuxLastLineExtension extends Extension {
         });
         this._menu.addMenuItem(this._joinItem);
         
-        this._sessionsSubmenu = new PopupMenu.PopupSubMenuMenuItem('Select session');
-        this._menu.addMenuItem(this._sessionsSubmenu);
+        // Add separator before sessions
+        this._sessionsSeperatorTop = new PopupMenu.PopupSeparatorMenuItem();
+        this._menu.addMenuItem(this._sessionsSeperatorTop);
+        
+        // Container for session items
+        this._sessionItemsContainer = [];
+        
+        this._sessionsSeperatorBottom = new PopupMenu.PopupSeparatorMenuItem();
+        this._menu.addMenuItem(this._sessionsSeperatorBottom);
         
         this._newItem = new PopupMenu.PopupMenuItem('Create new session');
         this._newItem.connect('activate', () => {
@@ -260,11 +293,20 @@ export default class TmuxLastLineExtension extends Extension {
             this._joinItem.visible = this._currentSession !== null;
         }
         
-        // Update sessions submenu
-        this._sessionsSubmenu.menu.removeAll();
+        // Remove all previous session items
+        this._sessionItemsContainer.forEach(item => {
+            item.destroy();
+        });
+        this._sessionItemsContainer = [];
+        
         let sessions = this._getAllSessions();
         
         if (sessions.length > 0) {
+            // Show separators
+            this._sessionsSeperatorTop.visible = true;
+            this._sessionsSeperatorBottom.visible = true;
+            
+            // Add session items between separators
             for (let session of sessions) {
                 let item = new PopupMenu.PopupMenuItem(session);
                 if (session === this._currentSession) {
@@ -272,15 +314,20 @@ export default class TmuxLastLineExtension extends Extension {
                 }
                 item.connect('activate', () => {
                     this._currentSession = session;
+                    this._userSelectedSession = session;
                     this._stopTmuxPipe();
                     this._startTmuxPipe(session);
                     this._menu.close();
                 });
-                this._sessionsSubmenu.menu.addMenuItem(item);
+                
+                // Insert item before the bottom separator
+                this._menu.box.insert_child_below(item, this._sessionsSeperatorBottom);
+                this._sessionItemsContainer.push(item);
             }
-            this._sessionsSubmenu.visible = true;
         } else {
-            this._sessionsSubmenu.visible = false;
+            // Hide separators when no sessions
+            this._sessionsSeperatorTop.visible = false;
+            this._sessionsSeperatorBottom.visible = false;
         }
     }
 
