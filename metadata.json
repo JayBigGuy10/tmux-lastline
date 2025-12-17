@@ -4,5 +4,6 @@
   "description": "Show the last line of tmux session in the top bar",
   "version": 1,
   "shell-version": ["46"],
-  "url": ""
+  "url": "",
+  "preferences-module": "prefs"
 }

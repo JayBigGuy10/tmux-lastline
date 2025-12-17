@@ -7,10 +7,33 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
+// Helper function to get settings with schema search path
+function getSettings() {
+    const extensionPath = import.meta.url.replace(/^file:\/\//, '').replace(/\/extension\.js$/, '');
+    const schemasDir = Gio.File.new_for_path(`${extensionPath}/schemas`);
+    const schemaSource = Gio.SettingsSchemaSource.new_from_directory(
+        schemasDir.get_path(),
+        Gio.SettingsSchemaSource.get_default(),
+        false
+    );
+    const schema = schemaSource.lookup('org.gnome.shell.extensions.tmux-lastline', false);
+    
+    if (!schema) {
+        throw new Error('Cannot find schema org.gnome.shell.extensions.tmux-lastline');
+    }
+    
+    return new Gio.Settings({
+        settings_schema: schema,
+    });
+}
+
 const BasicPanelMenu = GObject.registerClass(
     class BasicPanelMenu extends PanelMenu.Button {
         constructor() {
-            super(0.0, "Basic Panel Menu", false);
+            super(0.0, "Tmux Last Line", false);
+
+            // Initialize settings
+            this._settings = getSettings();
 
             // Add text label for selected session
             this._label = new St.Label({
@@ -203,7 +226,8 @@ const BasicPanelMenu = GObject.registerClass(
             try {
                 let [res, out, err, status] = GLib.spawn_command_line_sync('tmux list-sessions -F "#S"');
                 if (res && out) {
-                    let sessions = out.toString().trim().split('\n').filter(s => s.length > 0);
+                    let text = new TextDecoder().decode(out);
+                    let sessions = text.trim().split('\n').filter(s => s.length > 0);
                     return sessions;
                 }
             } catch (e) {
@@ -216,7 +240,8 @@ const BasicPanelMenu = GObject.registerClass(
             try {
                 let [res, out, err, status] = GLib.spawn_command_line_sync('tmux list-sessions -F "#S"');
                 if (res && out) {
-                    let sessions = out.toString().trim().split('\n').filter(s => s.length > 0);
+                    let text = new TextDecoder().decode(out);
+                    let sessions = text.trim().split('\n').filter(s => s.length > 0);
                     return sessions.length > 0 ? sessions[0] : null; // pick first session
                 }
             } catch (e) {
@@ -310,7 +335,28 @@ export function init() {
 
 export function enable() {
     menu = new BasicPanelMenu();
-    Main.panel.addToStatusArea('basic-panel-menu', menu);
+    
+    // Get settings for panel position and index
+    const settings = getSettings();
+    const panelPosition = settings.get_string('panel-position');
+    const panelIndex = settings.get_int('panel-index');
+    
+    // Map position to panel box
+    let panelBox;
+    switch (panelPosition) {
+        case 'left':
+            panelBox = Main.panel._leftBox;
+            break;
+        case 'right':
+            panelBox = Main.panel._rightBox;
+            break;
+        case 'center':
+        default:
+            panelBox = Main.panel._centerBox;
+    }
+    
+    // Add to status area with specified index
+    Main.panel.addToStatusArea('tmux-lastline', menu, panelIndex, panelPosition);
 }
 
 export function disable() {
