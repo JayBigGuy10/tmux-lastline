@@ -21,10 +21,12 @@ const BasicPanelMenu = GObject.registerClass(
 
             // Track selected session
             this._selectedSession = null;
+            this._userSelectedSession = null;
 
             // Initialize tmux pipe tracking
             this._tmuxProcess = null;
             this._fileMonitor = null;
+            this._sessionCheckTimeout = null;
 
             // Initial population of sessions
             this._refreshSessions();
@@ -33,6 +35,9 @@ const BasicPanelMenu = GObject.registerClass(
             this._selectedSession = this._getMostRecentSession();
             this._updateLabel();
             this._startTmuxPipe(this._selectedSession);
+
+            // Start continuous session change monitor
+            this._startSessionMonitor();
 
             // Connect to menu open signal to refresh sessions
             this.menu.connect('open-state-changed', (menu, open) => {
@@ -82,16 +87,19 @@ const BasicPanelMenu = GObject.registerClass(
                                 let combinedText = '';
                                 for (let i = lines.length - 1; i >= 0; i--) {
                                     let line = lines[i].trim();
-                                    // Strip ANSI color codes
-                                    line = line.replace(/\x1b\[[0-9;]*m/g, '');
+                                    // Strip all ANSI escape sequences and control characters
+                                    line = line.replace(/\x1b\[[^m]*m/g, '');  // Color codes
+                                    line = line.replace(/\x1b\[?[0-9;]*[a-zA-Z]/g, '');  // CSI sequences
+                                    line = line.replace(/\x1b[^\[]/g, '');  // Other escape sequences
+                                    line = line.replace(/[\x00-\x1f\x7f]/g, '');  // Control characters
                                     if (line.length === 0) continue;
                                     
                                     if (combinedText.length === 0) {
                                         combinedText = line;
                                     } else {
                                         let potential = line + ' | ' + combinedText;
-                                        // Also strip colors from potential before checking length
-                                        let potentialClean = potential.replace(/\x1b\[[0-9;]*m/g, '');
+                                        // Also strip codes from potential before checking length
+                                        let potentialClean = potential.replace(/\x1b\[[^m]*m/g, '').replace(/\x1b\[?[0-9;]*[a-zA-Z]/g, '').replace(/\x1b[^\[]/g, '').replace(/[\x00-\x1f\x7f]/g, '');
                                         if (potentialClean.length > maxLength) break;
                                         combinedText = potentialClean;
                                     }
@@ -128,6 +136,66 @@ const BasicPanelMenu = GObject.registerClass(
                     log("Error killing tmux pipe: " + e);
                 }
                 this._tmuxProcess = null;
+            }
+        }
+
+        _startSessionMonitor() {
+            // Clear any existing timeout
+            if (this._sessionCheckTimeout) {
+                GLib.source_remove(this._sessionCheckTimeout);
+            }
+
+            // Schedule next check
+            this._sessionCheckTimeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
+                this._checkSessionChange();
+                return true; // Keep timeout running
+            });
+        }
+
+        _stopSessionMonitor() {
+            if (this._sessionCheckTimeout) {
+                GLib.source_remove(this._sessionCheckTimeout);
+                this._sessionCheckTimeout = null;
+            }
+        }
+
+        _checkSessionChange() {
+            let sessions = this._getAllSessions();
+            
+            // If user selected a session, stick with it unless it no longer exists
+            if (this._userSelectedSession) {
+                if (sessions.includes(this._userSelectedSession)) {
+                    // User's selected session still exists, keep it
+                    if (this._selectedSession !== this._userSelectedSession) {
+                        this._stopTmuxPipe();
+                        this._selectedSession = this._userSelectedSession;
+                        this._startTmuxPipe(this._selectedSession);
+                    }
+                    return;
+                } else {
+                    // User's selected session no longer exists
+                    this._userSelectedSession = null;
+                    this._stopTmuxPipe();
+                    this._selectedSession = null;
+                }
+            }
+            
+            // Auto-select the first available session
+            if (sessions.length > 0) {
+                let newSession = sessions[0];
+                if (newSession !== this._selectedSession) {
+                    this._stopTmuxPipe();
+                    this._selectedSession = newSession;
+                    this._updateLabel();
+                    this._startTmuxPipe(this._selectedSession);
+                    this._refreshSessions();
+                }
+            } else {
+                if (this._selectedSession !== null) {
+                    this._stopTmuxPipe();
+                    this._selectedSession = null;
+                    this._updateLabel();
+                }
             }
         }
 
@@ -182,6 +250,7 @@ const BasicPanelMenu = GObject.registerClass(
                     
                     item.connect('activate', () => {
                         this._selectedSession = sessionName;
+                        this._userSelectedSession = sessionName;
                         console.log("Selected session: " + sessionName);
                         this._startTmuxPipe(sessionName);
                         this._refreshSessions();
@@ -246,6 +315,8 @@ export function enable() {
 
 export function disable() {
     if (menu) {
+        menu._stopSessionMonitor();
+        menu._stopTmuxPipe();
         menu.destroy();
         menu = null;
     }
