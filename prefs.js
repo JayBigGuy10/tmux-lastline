@@ -123,7 +123,7 @@ function buildPreferencesUI(window) {
     // Auto-switch on session exit toggle
     const autoSwitchRow = new Adw.SwitchRow({
         title: 'Auto-Switch on Exit',
-        subtitle: 'Switch to another session when current one exits',
+        subtitle: 'Switch to another session when the user selected one exits',
     });
     autoSwitchRow.set_active(settings.get_boolean('auto-switch-on-session-exit'));
     autoSwitchRow.connect('notify::active', () => {

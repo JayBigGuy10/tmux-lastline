@@ -1,5 +1,7 @@
  glib-compile-schemas schemas/
 
+ journalctl /usr/bin/gnome-shell -f -o cat
+
  Start a new session: Simply type tmux in your terminal.
 
 Start a named session: Use tmux new -s [session_name] to give your session a custom name for easier management.
