@@ -16,5 +16,20 @@
       <summary>Maximum label length</summary>
       <description>Maximum number of characters to display in the panel (0 = unlimited)</description>
     </key>
+    <key type="b" name="show-session-label">
+      <default>true</default>
+      <summary>Show session name in label</summary>
+      <description>Show the [session] prefix in the panel label</description>
+    </key>
+    <key type="b" name="truncate-from-start">
+      <default>false</default>
+      <summary>Truncate from start</summary>
+      <description>Show the end of the string when truncating (true = end, false = beginning)</description>
+    </key>
+    <key type="b" name="auto-switch-on-session-exit">
+      <default>true</default>
+      <summary>Auto-switch session on exit</summary>
+      <description>Automatically switch to another session when the current one exits</description>
+    </key>
   </schema>
 </schemalist>

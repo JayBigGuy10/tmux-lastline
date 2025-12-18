@@ -131,9 +131,17 @@ const BasicPanelMenu = GObject.registerClass(
                                 }
                                 
                                 if (combinedText.length > 0) {
-                                    if (maxLength > 0 && combinedText.length > maxLength)
-                                        combinedText = combinedText.substring(0, maxLength) + "…";
-                                    this._label.set_text(`[${session}] ${combinedText}`);
+                                    if (maxLength > 0 && combinedText.length > maxLength) {
+                                        const truncateFromStart = this._settings.get_boolean('truncate-from-start');
+                                        if (truncateFromStart) {
+                                            combinedText = "…" + combinedText.substring(combinedText.length - maxLength);
+                                        } else {
+                                            combinedText = combinedText.substring(0, maxLength) + "…";
+                                        }
+                                    }
+                                    const showSession = this._settings.get_boolean('show-session-label');
+                                    const labelText = showSession ? `[${session}] ${combinedText}` : combinedText;
+                                    this._label.set_text(labelText);
                                 }
                             }
                         } catch (e) {
@@ -200,6 +208,13 @@ const BasicPanelMenu = GObject.registerClass(
                     this._userSelectedSession = null;
                     this._stopTmuxPipe();
                     this._selectedSession = null;
+                    
+                    // Check if auto-switch is disabled
+                    const autoSwitch = this._settings.get_boolean('auto-switch-on-session-exit');
+                    if (!autoSwitch) {
+                        this._updateLabel();
+                        return;
+                    }
                 }
             }
             

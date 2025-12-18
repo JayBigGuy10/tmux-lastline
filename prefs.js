@@ -97,6 +97,39 @@ function buildPreferencesUI(window) {
         settings.set_int('max-length', Math.floor(maxLengthRow.get_value()));
     });
     maxLengthGroup.add(maxLengthRow);
+
+    // Show session label toggle
+    const sessionLabelRow = new Adw.SwitchRow({
+        title: 'Show Session Name',
+        subtitle: 'Display [session] prefix in the label',
+    });
+    sessionLabelRow.set_active(settings.get_boolean('show-session-label'));
+    sessionLabelRow.connect('notify::active', () => {
+        settings.set_boolean('show-session-label', sessionLabelRow.get_active());
+    });
+    maxLengthGroup.add(sessionLabelRow);
+
+    // Truncate from start toggle
+    const truncateFromStartRow = new Adw.SwitchRow({
+        title: 'Show End of String',
+        subtitle: 'When truncating, show the end instead of the beginning',
+    });
+    truncateFromStartRow.set_active(settings.get_boolean('truncate-from-start'));
+    truncateFromStartRow.connect('notify::active', () => {
+        settings.set_boolean('truncate-from-start', truncateFromStartRow.get_active());
+    });
+    maxLengthGroup.add(truncateFromStartRow);
+
+    // Auto-switch on session exit toggle
+    const autoSwitchRow = new Adw.SwitchRow({
+        title: 'Auto-Switch on Exit',
+        subtitle: 'Switch to another session when current one exits',
+    });
+    autoSwitchRow.set_active(settings.get_boolean('auto-switch-on-session-exit'));
+    autoSwitchRow.connect('notify::active', () => {
+        settings.set_boolean('auto-switch-on-session-exit', autoSwitchRow.get_active());
+    });
+    maxLengthGroup.add(autoSwitchRow);
 }
 
 // GNOME 42+ API
