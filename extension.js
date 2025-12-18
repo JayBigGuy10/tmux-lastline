@@ -68,6 +68,28 @@ const BasicPanelMenu = GObject.registerClass(
                     this._refreshSessions();
                 }
             });
+
+            // Connect to settings changes to apply them in real-time
+            this._settings.connect('changed::max-length', () => {
+                // Re-trigger file monitor to update with new max-length
+                if (this._selectedSession) {
+                    this._startTmuxPipe(this._selectedSession);
+                }
+            });
+
+            this._settings.connect('changed::show-session-label', () => {
+                // Trigger label update
+                if (this._selectedSession) {
+                    this._startTmuxPipe(this._selectedSession);
+                }
+            });
+
+            this._settings.connect('changed::truncate-from-start', () => {
+                // Trigger label update
+                if (this._selectedSession) {
+                    this._startTmuxPipe(this._selectedSession);
+                }
+            });
         }
 
         _updateLabel() {

@@ -9,3 +9,7 @@ Detach from a session: To leave a session running in the background, press the p
 Reattach to a session: To resume a detached session, use tmux attach or tmux attach-session -t [session_name] if you named it. 
 
 Ctrl-b then [ then you can use your normal navigation keys to scroll around (eg. Up Arrow or PgDn). Press q to quit scroll mode.
+
+todo
+- option to disable collecting last n lines until limit
+- regex include / exclude
