@@ -78,7 +78,7 @@ const BasicPanelMenu = GObject.registerClass(
         }
 
         _updateLabel() {
-            this._label.set_text(this._selectedSession ? `[${this._selectedSession}]` : `[${this._userSelectedSession ? this._userSelectedSession:"tmux"} n/a]`);
+            this._label.set_text(this._selectedSession ? `[${this._selectedSession}]` : `[${this._userSelectedSession ? this._userSelectedSession : "tmux"} n/a]`);
         }
 
         _startTmuxPipe(session) {
@@ -105,55 +105,62 @@ const BasicPanelMenu = GObject.registerClass(
                 let file = Gio.File.new_for_path(logFile);
                 this._fileMonitor = file.monitor_file(Gio.FileMonitorFlags.NONE, null);
 
+                function processLine(thiss) {
+                    try {
+                        const maxLength = thiss._settings.get_int('max-length') || 50;
+                        let [success, contents] = GLib.file_get_contents(logFile);
+                        if (success && contents.length > 0) {
+                            let lines = new TextDecoder().decode(contents).trim().split('\n');
+
+                            // collect lines until we have maxLength chars
+                            let combinedText = '';
+                            for (let i = lines.length - 1; i >= 0; i--) {
+                                let line = lines[i].trim();
+                                // Strip all ANSI escape sequences and control characters
+                                line = line.replace(/\x1b\[[^m]*m/g, '');  // Color codes
+                                line = line.replace(/\x1b\[?[0-9;]*[a-zA-Z]/g, '');  // CSI sequences
+                                line = line.replace(/\x1b[^\[]/g, '');  // Other escape sequences
+                                line = line.replace(/[\x00-\x1f\x7f]/g, '');  // Control characters
+                                line = line.replace(/\[\?[0-9;]*[a-zA-Z]?/g, '');  // Leftover partial escape sequences
+                                if (line.length === 0) continue;
+
+                                if (combinedText.length === 0) {
+                                    combinedText = line;
+                                } else {
+                                    let potential = line + ' | ' + combinedText;
+
+                                    if (maxLength > 0 && potential.length > maxLength) break;
+                                    combinedText = potential;
+                                }
+
+                                if (maxLength > 0 && combinedText.length >= maxLength) break;
+                            }
+
+                            if (combinedText.length > 0) {
+                                if (maxLength > 0 && combinedText.length > maxLength) {
+                                    const truncateFromStart = thiss._settings.get_boolean('truncate-from-start');
+                                    if (truncateFromStart) {
+                                        combinedText = "…" + combinedText.substring(combinedText.length - maxLength);
+                                    } else {
+                                        combinedText = combinedText.substring(0, maxLength) + "…";
+                                    }
+                                }
+                                const showSession = thiss._settings.get_boolean('show-session-label');
+                                const labelText = showSession ? `[${session}] ${combinedText}` : combinedText;
+                                thiss._label.set_text(labelText);
+                            }
+                        }
+                    } catch (e) {
+                        thiss._label.set_text(`[${session} error ${e}]`);
+                        log("Error reading log file: " + e);
+                    }
+                }
+
+                processLine(this);
+
                 this._fileMonitor.connect('changed', (monitor, file, otherFile, eventType) => {
                     if (eventType === Gio.FileMonitorEvent.CHANGED || eventType === Gio.FileMonitorEvent.CREATED) {
-                        try {
-                            const maxLength = this._settings.get_int('max-length') || 50;
-                            let [success, contents] = GLib.file_get_contents(logFile);
-                            if (success && contents.length > 0) {
-                                let lines = new TextDecoder().decode(contents).trim().split('\n');
-
-                                // collect lines until we have maxLength chars
-                                let combinedText = '';
-                                for (let i = lines.length - 1; i >= 0; i--) {
-                                    let line = lines[i].trim();
-                                    // Strip all ANSI escape sequences and control characters
-                                    line = line.replace(/\x1b\[[^m]*m/g, '');  // Color codes
-                                    line = line.replace(/\x1b\[?[0-9;]*[a-zA-Z]/g, '');  // CSI sequences
-                                    line = line.replace(/\x1b[^\[]/g, '');  // Other escape sequences
-                                    line = line.replace(/[\x00-\x1f\x7f]/g, '');  // Control characters
-                                    if (line.length === 0) continue;
-
-                                    if (combinedText.length === 0) {
-                                        combinedText = line;
-                                    } else {
-                                        let potential = line + ' | ' + combinedText;
-
-                                        if (maxLength > 0 && potential.length > maxLength) break;
-                                        combinedText = potential;
-                                    }
-
-                                    if (maxLength > 0 && combinedText.length >= maxLength) break;
-                                }
-
-                                if (combinedText.length > 0) {
-                                    if (maxLength > 0 && combinedText.length > maxLength) {
-                                        const truncateFromStart = this._settings.get_boolean('truncate-from-start');
-                                        if (truncateFromStart) {
-                                            combinedText = "…" + combinedText.substring(combinedText.length - maxLength);
-                                        } else {
-                                            combinedText = combinedText.substring(0, maxLength) + "…";
-                                        }
-                                    }
-                                    const showSession = this._settings.get_boolean('show-session-label');
-                                    const labelText = showSession ? `[${session}] ${combinedText}` : combinedText;
-                                    this._label.set_text(labelText);
-                                }
-                            }
-                        } catch (e) {
-                            this._label.set_text(`[${session} error ${e}]`);
-                            log("Error reading log file: " + e);
-                        }
+                        processLine(this);
                     }
                 });
             } catch (e) {
@@ -232,7 +239,7 @@ const BasicPanelMenu = GObject.registerClass(
                 this._updateLabel();
                 this._startTmuxPipe(this._selectedSession);
                 this._refreshSessions();
-                
+
             } else {
                 if (this._selectedSession !== null) {
                     this._stopTmuxPipe();
